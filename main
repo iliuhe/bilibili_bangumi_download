@@ -1,0 +1,140 @@
+
+import httplib
+import urllib
+import subprocess
+import os
+import subprocess
+import gc
+from pyquery import PyQuery as pq
+
+
+# note all urls are bamgumi pages
+# wolf and spicy season 1 and 2
+wolf1 = 'http://bangumi.bilibili.com/anime/1071'
+wolf2 = 'http://bangumi.bilibili.com/anime/1072'
+
+ua = r"Mozilla/5.0 (X11; Linux x86_64; rv:7.0.1) Gecko/20100101 Firefox/7.0.1"
+
+# get urls for each video in the bangumi
+def bili_bangumi_analysis(url):
+    html = pq(url)
+    li = html('li[class="v1-bangumi-list-part-child"]')
+    N = len(li) / 2
+    a = li.children('a')
+    output = []
+    for i in range(N):
+        temp = pq(a[N + i])
+        output.append(temp.attr('href'))
+    return output
+
+# use KISSTUDOU to analysis the video sources
+def response(url, fmt = "real"):
+    http = httplib.HTTP("www.flvcd.com")
+    http.putrequest("GET", "/parse.php?format=" + fmt + "&kw=" + urllib.quote(url))
+    http.putheader("User-Agent", ua)
+    http.putheader("Host", "www.flvcd.com")
+    http.putheader("Accept", "*/*")
+    print ' ?'
+    http.endheaders()
+    errcode, errmsg, headers = http.getreply()
+    
+    #print "Status:", errcode, errmsg
+    if errcode!=200:
+        print "Error encountered while parsing url"
+        return -1
+    res = http.getfile()
+
+    html = ''
+    data = res.read(512)
+    while data != '':
+        html += data
+        data = res.read(512)
+    html = html.decode('gbk') # gbk chinese simplify encoding method
+    return html
+
+# take out the video source
+def html_extract(html):
+    q = pq(html)
+
+    form = q('form[name="mform"]')
+    #print form
+    file_a = form.parent('td').parent('tr').prev().children().children('a')
+    # notice this file_a includes all the <a> and form a "list"
+    clip_url = []
+    for f in file_a:
+        a = pq(f)
+        clip_url.append(a.attr('href'))
+    return clip_url
+
+# download one clip using WGET
+def single_download(clip_url, save_dir):
+    #subprocess.call("wget " + clip_url[0] + " -P " + save_dir)
+    #subprocess.call("wget -help", shell = True)
+    cmd = 'wget "' + clip_url + '" -O ' + save_dir
+    try:
+        exe(cmd)
+    except:
+        print 'break'
+        print clip_url
+
+# helperfunction to do cmd in windows
+def exe(cmd, std = True):
+    print cmd
+    p = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, shell = True)
+    if std:
+        while True:
+          line = p.stdout.readline()
+          line = line.replace('\n', '')
+          print line
+          if not line: break
+
+def i2s_2digit(x):
+    return str(x) if x > 9 else '0'+str(x)
+
+def get_bili_video_address(bili_url, fmt = "real"):
+    output = {}
+    for i, url in enumerate(bili_url):
+        h = response(url, fmt)
+        c = html_extract(h)
+        output[i + 1] = c
+    return output
+
+# download all the clips using WGET
+def massive_download(list_dict, save_location):
+    os.chdir(save_location)
+    for i in range(len(list_dict)):
+        print len(list_dict[i + 1])
+        if len(list_dict[i + 1]) == 1:
+            single_download(list_dict[i + 1][0], save_location + '/' + str(i + 1) + '.flv')
+            continue
+        ffmpeg_merge_txt = 'temp_' + str(i + 1) +'.txt'
+        f = open(ffmpeg_merge_txt, 'w')
+        for j, address in enumerate(list_dict[i + 1]):
+            filename = str(i + 1) + '_' + str(j + 1) + '.flv'
+            single_download(address, save_location + '/' + filename)
+            f.write("file '" + filename + "' \n")
+        f.close()
+        ffmpeg_cmd = 'ffmpeg -f concat -i temp_' + str(i + 1) +'.txt -c copy ' + str(i + 1) + '.flv'
+        #os.remove(ffmpeg_merge_txt)
+        try:
+            FNULL = open(os.devnull, 'w')
+            subprocess.call(ffmpeg_cmd, stdout=FNULL, stderr=FNULL, shell=False)
+        except:
+            print 'ffmpeg merge error'
+
+# munully merge videos using FFMPEG
+def merge_munully(target_dir, N):
+    os.chdir(target_dir)
+    for i in range(1, N):
+        cmd = 'ffmpeg -f concat -i temp_' + str(i) +'.txt -c copy ' + str(i) + '.flv'
+        FNULL = open(os.devnull, 'w')
+        subprocess.call(cmd, stdout=FNULL, stderr=FNULL, shell=False)
+
+def main(bangumi_url, save_folder):
+    bangumi = bili_bangumi_analysis(wolf2)
+    download_list = get_bili_video_address(bangumi)
+    if not os.path.exists(save_folder):
+        os.mkdir(save_folder)
+    massive_download(download_list, save_folder)
+    gc.collect()
+
