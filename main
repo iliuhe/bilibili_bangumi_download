@@ -34,7 +34,7 @@ def response(url, fmt = "real"):
     http.putheader("User-Agent", ua)
     http.putheader("Host", "www.flvcd.com")
     http.putheader("Accept", "*/*")
-    print ' ?'
+    print '_'
     http.endheaders()
     errcode, errmsg, headers = http.getreply()
     
