@@ -1,9 +1,14 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Oct 24 21:04:06 2016
+
+@author: iliuh
+"""
 
 import httplib
 import urllib
 import subprocess
 import os
-import subprocess
 import gc
 from pyquery import PyQuery as pq
 
@@ -14,6 +19,40 @@ wolf1 = 'http://bangumi.bilibili.com/anime/1071'
 wolf2 = 'http://bangumi.bilibili.com/anime/1072'
 
 ua = r"Mozilla/5.0 (X11; Linux x86_64; rv:7.0.1) Gecko/20100101 Firefox/7.0.1"
+
+def list2txt(input_list, save_dir):
+    f = open(save_dir, 'wb')
+    for item in input_list:
+        f.write(item + '\n')
+    f.close()
+
+def dic2txt(input_dic, save_dir):
+    f = open(save_dir, 'wb')
+    for d in input_dic:
+        f.write(str(d) + '\n')
+        for i in input_dic[d]:
+            f.write('\t' + i + '\n')
+    f.close()
+
+def txt2list(save_dir):
+    f = open(save_dir, 'rb')
+    output = []
+    for line in f.readlines():
+        output.append(line)
+    f.close()
+    return output
+
+def txt2dic(save_dir):
+    f = open(save_dir, 'rb')
+    output = {}
+    for line in f.readlines():
+        if line[0] != '\t':
+            header = int(line.split('\n')[0])
+            output[header] = []
+        else:
+            output[header].append(line.split('\t')[-1].split('\n')[0])
+    f.close()
+    return output
 
 # get urls for each video in the bangumi
 def bili_bangumi_analysis(url):
@@ -34,7 +73,6 @@ def response(url, fmt = "real"):
     http.putheader("User-Agent", ua)
     http.putheader("Host", "www.flvcd.com")
     http.putheader("Accept", "*/*")
-    print '_'
     http.endheaders()
     errcode, errmsg, headers = http.getreply()
     
@@ -131,10 +169,15 @@ def merge_munully(target_dir, N):
         subprocess.call(cmd, stdout=FNULL, stderr=FNULL, shell=False)
 
 def main(bangumi_url, save_folder):
-    bangumi = bili_bangumi_analysis(wolf2)
+    bangumi = bili_bangumi_analysis(bangumi_url)
     download_list = get_bili_video_address(bangumi)
+    dic2txt(download_list, save_folder + '/.logger.txt')
+    # download
     if not os.path.exists(save_folder):
         os.mkdir(save_folder)
-    massive_download(download_list, save_folder)
+    #temp = txt2dic(save_folder + '/.logger.txt')
+    
+    #massive_download(download_list, save_folder)
     gc.collect()
 
+#main('http://bangumi.bilibili.com/anime/444', 'c:/wget/mao')
